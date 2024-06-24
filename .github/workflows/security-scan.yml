@@ -11,16 +11,13 @@ concurrency:
   cancel-in-progress: true
 permissions: write-all
 env:
-  GIT_PAT: ${{ secrets.GIT_PAT }}
   HUB_USER: flaviuspetrisor
-  AWS_REGION: eu-central-1
-  HUB_REPO: "hub.docker.com"
 
 jobs:
   Get-Path:
     runs-on: ubuntu-latest
     container:
-      image: flaviuspetrisor/qued:base
+      image: flaviuspetrisor/qed:base
       credentials:
         username: ${{ env.HUB_USER }}
         password: ${{ secrets.HUB_PASS }}
@@ -52,7 +49,7 @@ jobs:
         modules: ${{ fromJson( needs.Get-Path.outputs.modules) }}
       fail-fast: false
     container:
-      image: flaviuspetrisor/qued:base
+      image: flaviuspetrisor/qed:base
       credentials:
         username: ${{ env.HUB_USER }}
         password: ${{ secrets.HUB_PASS }}
