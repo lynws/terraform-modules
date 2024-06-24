@@ -1,0 +1,69 @@
+name: TFSec Scan
+on:
+  pull_request:
+    types: [ opened, reopened, synchronize ]
+    branches:
+      - main
+    paths:
+      - "modules/**"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+permissions: write-all
+env:
+  GIT_PAT: ${{ secrets.GIT_PAT }}
+  HUB_USER: flaviuspetrisor
+  AWS_REGION: eu-central-1
+  HUB_REPO: "hub.docker.com"
+
+jobs:
+  Get-Path:
+    runs-on: ubuntu-latest
+    container:
+      image: flaviuspetrisor/qued:base
+      credentials:
+        username: ${{ env.HUB_USER }}
+        password: ${{ secrets.HUB_PASS }}
+    outputs:
+      modules: ${{ steps.get-changes.outputs.modules }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
+      - name: Save Path Changes
+        id: get-changes
+        run: |
+          previous=$(git log -2 --format=%H | sed -n '2p')
+          current=$(git log -2 --format=%H | sed -n '1p')
+          modules=$(git diff --name-only $current $previous | grep 'modules/' | grep -v 'README.md' | awk -F/ '{print $2}' | uniq | jq -R -s -c 'split("\n")[:-1]')
+          echo "modules=$modules" >> $GITHUB_OUTPUT
+      - name: Workspace Clean
+        if: always()
+        run: find . -mindepth 1 -maxdepth 1 -exec rm -rf {} + || true
+
+  Modules-Scanner:
+    needs: [ Get-Path ]
+    if: ${{ needs.Get-Path.outputs.modules != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        modules: ${{ fromJson( needs.Get-Path.outputs.modules) }}
+      fail-fast: false
+    container:
+      image: flaviuspetrisor/qued:base
+      credentials:
+        username: ${{ env.HUB_USER }}
+        password: ${{ secrets.HUB_PASS }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Show Security Results
+        run: tfsec --format=default --soft-fail modules/${{ matrix.modules }}
+        shell: bash
+
+      - name: Workspace Clean
+        if: always()
+        run: find . -mindepth 1 -maxdepth 1 -exec rm -rf {} + || true
