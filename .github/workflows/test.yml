@@ -1,0 +1,27 @@
+name: Test
+on:
+  push:
+    branches:
+      - main
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+permissions: write-all
+jobs:
+  Get-Path:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout by commit hash
+        uses: actions/checkout@v3
+      - name: Save credentials
+        run: echo test > test.txt
+        shell: bash
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: output
+          path: test.txt
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: output
